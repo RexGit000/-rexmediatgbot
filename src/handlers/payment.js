@@ -43,7 +43,7 @@ module.exports = (bot) => {
 
       // Stars are already charged — deliver the full order (mix seen/unseen as needed)
       const user = await User.findOne({ telegramId: ctx.from.id });
-      const items = await deliverMedia(bot, ctx.from.id, mediaCount);
+      const items = await deliverMedia(bot.telegram, ctx.from.id, mediaCount);
       const delivered = items.length;
 
       // Track received history

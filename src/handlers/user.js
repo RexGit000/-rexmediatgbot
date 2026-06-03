@@ -17,7 +17,7 @@ async function unseenCount(user) {
 
 async function executeRedemption(ctx, bot, user, qty, mode) {
   const excludeIds = mode === 'unseen' ? (user.receivedMedia || []) : [];
-  const items = await deliverMedia(bot, ctx.from.id, qty, { excludeIds });
+  const items = await deliverMedia(bot.telegram, ctx.from.id, qty, { excludeIds });
   const delivered = items.length;
   const cost = delivered * POINTS_PER_MEDIA;
 

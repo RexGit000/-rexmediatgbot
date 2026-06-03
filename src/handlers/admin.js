@@ -62,6 +62,12 @@ async function showUserList(ctx, page, edit = false) {
 }
 
 module.exports = (bot) => {
+  // ── Gift Media ────────────────────────────────────────────────────────
+  bot.hears('🎁 Gift Media', async (ctx) => {
+    if (!adminGuard(ctx)) return;
+    return ctx.scene.enter('GIFT_MEDIA');
+  });
+
   // ── Switch to User View ───────────────────────────────────────────────────
   bot.hears('👤 Switch to User View', async (ctx) => {
     if (!adminGuard(ctx)) return;

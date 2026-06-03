@@ -7,7 +7,8 @@ function mainAdminKeyboard() {
     ['📁 Media Management', '👥 Admin Management'],
     ['📢 Broadcast',        '📦 Package Settings'],
     ['📺 File Channel',     '📋 User List'],
-    [toggleBtn,             '👤 Switch to User View'],
+    ['🎁 Gift Media',       toggleBtn],
+    ['👤 Switch to User View'],
   ]).resize();
 }
 

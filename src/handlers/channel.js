@@ -2,6 +2,7 @@ const Media    = require('../models/Media');
 const Settings = require('../models/Settings');
 const adminCache = require('../cache');
 const { enqueue } = require('../services/queue');
+const { mirrorChannelPost } = require('../services/advertisedRelay');
 
 module.exports = (bot) => {
   bot.on('channel_post', async (ctx) => {
@@ -30,6 +31,8 @@ module.exports = (bot) => {
         channelMessageId: post.message_id,
         channelId,
       });
+
+      mirrorChannelPost(bot.telegram, { channelId, messageId: post.message_id });
 
       const total = await Media.countDocuments();
 
