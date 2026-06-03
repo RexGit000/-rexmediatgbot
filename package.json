@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "seed:admins": "node src/seed.js --admins-only"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

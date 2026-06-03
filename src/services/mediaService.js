@@ -1,6 +1,27 @@
 const Media = require('../models/Media');
 const { enqueue } = require('./queue');
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function withRetry(fn, maxRetries = 5) {
+  let retries = 0;
+  while (retries < maxRetries) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (err.response && err.response.error_code === 429 && err.response.parameters && err.response.parameters.retry_after) {
+        const retryAfter = err.response.parameters.retry_after * 1000;
+        console.log(`[withRetry] Got 429, waiting ${retryAfter}ms...`);
+        await sleep(retryAfter);
+        retries++;
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error(`Max retries (${maxRetries}) exceeded`);
+}
+
 /**
  * Delivers up to `count` media items to `chatId`.
  * Pass `excludeIds` to skip items the user has already received.
@@ -33,11 +54,13 @@ async function deliverMedia(telegram, chatId, count, { excludeIds = [] } = {}) {
 
       try {
         await enqueue(async () => {
-          if (item.fileType === 'photo') {
-            await telegram.sendPhoto(chatId, item.fileId);
-          } else {
-            await telegram.sendVideo(chatId, item.fileId);
-          }
+          await withRetry(async () => {
+            if (item.fileType === 'photo') {
+              await telegram.sendPhoto(chatId, item.fileId);
+            } else {
+              await telegram.sendVideo(chatId, item.fileId);
+            }
+          });
         });
 
         delivered.push(item);
@@ -53,4 +76,4 @@ async function deliverMedia(telegram, chatId, count, { excludeIds = [] } = {}) {
   return delivered;
 }
 
-module.exports = { deliverMedia };
+module.exports = { deliverMedia, withRetry };

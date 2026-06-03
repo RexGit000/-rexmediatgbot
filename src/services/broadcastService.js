@@ -6,6 +6,25 @@ const { sleep } = require('../utils/helpers');
 const BATCH_SIZE = 25;
 const BATCH_DELAY = 1000; // ms between batches
 
+async function withRetry(fn, maxRetries = 5) {
+  let retries = 0;
+  while (retries < maxRetries) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (err.response && err.response.error_code === 429 && err.response.parameters && err.response.parameters.retry_after) {
+        const retryAfter = err.response.parameters.retry_after * 1000;
+        console.log(`[withRetry] Got 429, waiting ${retryAfter}ms...`);
+        await sleep(retryAfter);
+        retries++;
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error(`Max retries (${maxRetries}) exceeded`);
+}
+
 /**
  * Broadcasts a message (by copy) to all registered users.
  * @param {object} bot         - Telegraf bot instance
@@ -35,12 +54,14 @@ async function broadcastMessage(bot, msgInfo, linkButtons = []) {
       batch.map((user) =>
         enqueueBroadcast(async () => {
           try {
-            await bot.telegram.copyMessage(
-              user.telegramId,
-              msgInfo.chatId,
-              msgInfo.messageId,
-              replyMarkup ? { reply_markup: replyMarkup } : {}
-            );
+            await withRetry(async () => {
+              await bot.telegram.copyMessage(
+                user.telegramId,
+                msgInfo.chatId,
+                msgInfo.messageId,
+                replyMarkup ? { reply_markup: replyMarkup } : {}
+              );
+            });
             sent++;
           } catch {
             failed++;

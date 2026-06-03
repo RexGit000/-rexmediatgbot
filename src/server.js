@@ -7,6 +7,7 @@ const adminCache   = require('./cache');
 const botState     = require('./services/botState');
 const bot          = require('./bot');
 const { syncMediaPool } = require('./services/syncService');
+const { seedAdmins } = require('./seed');
 
 const SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -40,6 +41,8 @@ app.use((err, _req, res, _next) => {
 async function boot() {
   try {
     await connectDB();
+
+    await seedAdmins();
 
     // Load admin cache into memory
     const admins = await Admin.find().lean();

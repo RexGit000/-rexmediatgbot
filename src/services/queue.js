@@ -4,14 +4,14 @@ const Queue = _Q.default ?? _Q;
 // Main queue for single-user API calls (media delivery, admin notifications)
 const tgQueue = new Queue({
   concurrent: 1,
-  interval: 60,   // ~16 req/s — well within Telegram limits
+  interval: 500,  // 2 requests per second to the same user
   start: true,
 });
 
 // Separate queue for broadcasts — slightly higher concurrency
 const broadcastQueue = new Queue({
   concurrent: 3,
-  interval: 100,  // 3 msgs per 100ms = 30 msg/s
+  interval: 200,  // 15 messages per second for broadcasts
   start: true,
 });
 
