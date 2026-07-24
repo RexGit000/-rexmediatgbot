@@ -1,4 +1,4 @@
-require('dotenv').config({ override: true });
+require('dotenv').config();
 const express  = require('express');
 const connectDB    = require('./db');
 const Admin        = require('./models/Admin');
@@ -36,6 +36,8 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+app.listen(PORT, () => console.log(`HTTP server listening on port ${PORT}`));
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function boot() {
@@ -53,9 +55,6 @@ async function boot() {
     const savedBotState = await Settings.get('botEnabled');
     botState.set(savedBotState !== false);
     console.log(`Bot state: ${botState.get() ? 'enabled' : 'disabled'}`);
-
-    // Start Express
-    app.listen(PORT, () => console.log(`HTTP server listening on port ${PORT}`));
 
     // Verify token + get bot identity (plain API call, works before launch)
     const me = await bot.telegram.getMe();

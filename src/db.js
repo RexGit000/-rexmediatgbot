@@ -1,4 +1,4 @@
-require('dotenv').config({ override: true });
+require('dotenv').config();
 const mongoose = require('mongoose');
 
 async function connectDB() {
