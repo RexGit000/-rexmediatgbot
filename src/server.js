@@ -5,13 +5,12 @@ const Admin        = require('./models/Admin');
 const Settings     = require('./models/Settings');
 const adminCache   = require('./cache');
 const botState     = require('./services/botState');
-const bot          = require('./bot');
 const { syncMediaPool } = require('./services/syncService');
 const { seedAdmins } = require('./seed');
 
 const SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.port || process.env.PORT || 3000);
 
 // ── Process-level safety nets ─────────────────────────────────────────────────
 
@@ -28,7 +27,35 @@ process.on('unhandledRejection', (reason) => {
 const app = express();
 app.use(express.json());
 
-app.get('/ping', (_req, res) => res.send('hello world'));
+let pingCount = 0;
+let lastPingAt = null;
+
+app.get('/ping', (req, res) => {
+  pingCount += 1;
+  lastPingAt = new Date();
+  res.set('Cache-Control', 'no-store');
+  res.status(200).send('hello world');
+});
+
+app.get('/', (_req, res) => res.redirect('/stats'));
+
+app.get('/stats', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const mem = process.memoryUsage();
+  res.status(200).json({
+    ok: true,
+    now: new Date().toISOString(),
+    uptimeSec: Math.floor(process.uptime()),
+    pingCount,
+    lastPingAt: lastPingAt ? lastPingAt.toISOString() : null,
+    memory: {
+      rss: mem.rss,
+      heapUsed: mem.heapUsed,
+      heapTotal: mem.heapTotal,
+      external: mem.external,
+    },
+  });
+});
 
 // Express error middleware
 app.use((err, _req, res, _next) => {
@@ -39,6 +66,8 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => console.log(`HTTP server listening on port ${PORT}`));
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+
+let bot = null;
 
 async function boot() {
   try {
@@ -55,6 +84,8 @@ async function boot() {
     const savedBotState = await Settings.get('botEnabled');
     botState.set(savedBotState !== false);
     console.log(`Bot state: ${botState.get() ? 'enabled' : 'disabled'}`);
+
+    bot = require('./bot');
 
     // Verify token + get bot identity (plain API call, works before launch)
     const me = await bot.telegram.getMe();
