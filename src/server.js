@@ -179,10 +179,12 @@ app.post('/api/payment-success', async (req, res) => {
           { parse_mode: 'Markdown' }
         );
 
-        const items = await deliverMedia(bot.telegram, Number(userId), finalMediaCount);
+        const user = await User.findOne({ telegramId: Number(userId) });
+        const items = await deliverMedia(bot.telegram, Number(userId), finalMediaCount, {
+          excludeIds: user?.receivedMedia || [],
+        });
         const delivered = items.length;
 
-        const user = await User.findOne({ telegramId: Number(userId) });
         if (user && items.length) {
           const existingSet = new Set((user.receivedMedia || []).map((id) => id.toString()));
           for (const item of items) {
