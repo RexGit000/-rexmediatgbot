@@ -11,6 +11,7 @@ const bot          = require('./bot');
 const { syncMediaPool } = require('./services/syncService');
 const { deliverMedia } = require('./services/mediaService');
 const { seedAdmins } = require('./seed');
+const { deliverWithVerification } = require('./utils/mediaSendObserver');
 
 const SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -180,23 +181,60 @@ app.post('/api/payment-success', async (req, res) => {
         );
 
         const user = await User.findOne({ telegramId: Number(userId) });
-        const items = await deliverMedia(bot.telegram, Number(userId), finalMediaCount, {
-          excludeIds: user?.receivedMedia || [],
-        });
-        const delivered = items.length;
 
-        if (user && items.length) {
-          const existingSet = new Set((user.receivedMedia || []).map((id) => id.toString()));
-          for (const item of items) {
-            const id = item._id.toString();
-            if (!existingSet.has(id)) { user.receivedMedia.push(item._id); existingSet.add(id); }
+        function rememberBatchInline(batchItems) {
+          if (!user || !Array.isArray(batchItems) || !batchItems.length) return false;
+          if (!Array.isArray(user.receivedMedia)) user.receivedMedia = [];
+          const existingSet = new Set(user.receivedMedia.map((id) => id.toString()));
+          let changed = false;
+          for (const item of batchItems) {
+            if (!item || item._id == null) continue;
+            const id = String(item._id);
+            if (!existingSet.has(id)) {
+              user.receivedMedia.push(item._id);
+              existingSet.add(id);
+              changed = true;
+            }
           }
-          await user.save();
+          return changed;
+        }
+
+        const result = await deliverWithVerification({
+          telegram: bot.telegram,
+          chatId,
+          userId: Number(userId),
+          orderId: String(orderId),
+          finalMediaCount,
+          userRecord: user,
+          deliverMediaFn: deliverMedia,
+          rememberDeliveredMediaFn: rememberBatchInline,
+          onNewBatchDelivered: async (items) => {
+            if (user && Array.isArray(items) && items.length) {
+              const changed = rememberBatchInline(items);
+              if (changed) {
+                try { await user.save(); } catch (_e) { /* swallow */ }
+              }
+            }
+          },
+          adminIdResolver: () => {
+            try {
+              const list = adminCache.getList ? adminCache.getList() : adminCache.get();
+              if (Array.isArray(list)) {
+                return list.map((a) => a.telegramId || a.id || a).map(Number).filter((n) => Number.isFinite(n));
+              }
+              return [];
+            } catch (_e) { return []; }
+          },
+          botUsername: process.env.BOT_USERNAME || 'rexmediatgbot',
+        });
+
+        if (result.rememberChanged && user) {
+          try { await user.save(); } catch (_e) { /* swallow */ }
         }
 
         await bot.telegram.sendMessage(
           chatId,
-          `🎬 Enjoy your ${delivered} item(s)!`,
+          `🎬 Enjoy your ${result.actualCount} item(s)!`,
           { parse_mode: 'Markdown' }
         );
       } catch (err) {
