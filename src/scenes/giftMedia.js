@@ -4,6 +4,8 @@ const User = require('../models/User');
 const { mainAdminKeyboard, cancelKeyboard } = require('../keyboards/admin');
 const { formatCompactNumber, parseAdminInput } = require('../utils/helpers');
 const { deliverMedia } = require('../services/mediaService');
+const { deliverWithVerification } = require('../utils/mediaSendObserver');
+const adminCache = require('../cache');
 
 const giftMediaScene = new Scenes.BaseScene('GIFT_MEDIA');
 
@@ -99,7 +101,6 @@ giftMediaScene.on(message('text'), async (ctx) => {
 
   if (ctx.scene.state.step === 'awaiting_user_input') {
     const { telegramId, username } = parseAdminInput(text);
-    // Strip @ prefix from username when querying database
     const dbUsername = username ? username.replace(/^@/, '') : null;
     const query = telegramId ? { telegramId } : (dbUsername ? { username: dbUsername } : null);
     if (!query) {
@@ -109,23 +110,18 @@ giftMediaScene.on(message('text'), async (ctx) => {
 
     let user = await User.findOne(query);
 
-    // If not found by username/ID, try searching by ID if we had a username, or vice versa
     if (!user && username) {
-      // If we searched by username, let's see if we have any other way, but can't resolve via API
       user = null;
     } else if (!user && telegramId) {
-      // If we have numeric ID, try getChat just to confirm, but even that might fail if no prior interaction
       try {
         const chat = await ctx.telegram.getChat(telegramId);
         if (chat) {
-          // Check if we have the user by ID in our DB (maybe username changed?)
           user = await User.findOne({ telegramId: chat.id });
           if (user && chat.username && user.username !== chat.username) {
             await User.updateOne({ _id: user._id }, { username: chat.username });
             user.username = chat.username;
           }
           if (!user) {
-            // Create temp target if we can get chat info
             user = {
               telegramId: chat.id,
               username: chat.username || null,
@@ -174,22 +170,35 @@ giftMediaScene.on(message('text'), async (ctx) => {
     }
 
     try {
-      const items = await deliverMedia(ctx.telegram, user.telegramId, count, { excludeIds: user.receivedMedia || [] });
-      const delivered = items.length;
+      const result = await deliverWithVerification({
+        telegram: ctx.telegram,
+        chatId: user.telegramId,
+        userId: Number(user.telegramId),
+        finalMediaCount: count,
+        userRecord: user,
+        deliverMediaFn: deliverMedia,
+        adminIdResolver: () => {
+          try {
+            const list = adminCache.getAll();
+            if (Array.isArray(list)) {
+              return list.map((a) => a.telegramId || a.id || a).map(Number).filter((n) => Number.isFinite(n));
+            }
+            return [];
+          } catch (_e) { return []; }
+        },
+        botUsername: process.env.BOT_USERNAME || 'rexmediatgbot',
+      });
 
-      if (delivered > 0 && !user._isTemporary) {
-        await User.updateOne(
-          { _id: user._id },
-          { $addToSet: { receivedMedia: { $each: items.map((item) => item._id) } } }
-        );
-      }
+      const promised = result.promised;
+      const actual = result.actualCount;
+      const shortfall = result.shortfall;
 
-      if (delivered > 0) {
+      if (actual > 0 && actual === promised) {
         try {
-          const verb = delivered === 1 ? 'was' : 'were';
+          const verb = actual === 1 ? 'was' : 'were';
           await ctx.telegram.sendMessage(
             user.telegramId,
-            `${delivered} media ${verb} gifted to you by the admin, Enjoy🎉`
+            `${actual} media ${verb} gifted to you by the admin, Enjoy🎉`
           );
         } catch (err) {
           console.error('[giftMedia] Failed to notify user:', err.message);
@@ -197,10 +206,22 @@ giftMediaScene.on(message('text'), async (ctx) => {
       }
 
       const name = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Unknown';
-      await ctx.reply(
-        `✅ Gift sent!\nDelivered ${formatCompactNumber(delivered)} media items to ${name}${user.username ? ` (@${user.username})` : ''}`,
-        { ...mainAdminKeyboard() }
-      );
+      if (shortfall > 0) {
+        await ctx.reply(
+          `⚠️ Gift had shortfall\nRequested: ${formatCompactNumber(promised)}\nDelivered: ${formatCompactNumber(actual)}\nShortfall: ${shortfall}\nUser NOT notified (shortfall gate).\nTarget: ${name}${user.username ? ` (@${user.username})` : ''}`,
+          { ...mainAdminKeyboard() }
+        );
+      } else if (actual === 0) {
+        await ctx.reply(
+          `❌ Gift delivered zero media items.\nRequested: ${formatCompactNumber(promised)}\nTarget: ${name}${user.username ? ` (@${user.username})` : ''}`,
+          { ...mainAdminKeyboard() }
+        );
+      } else {
+        await ctx.reply(
+          `✅ Gift sent!\nDelivered ${formatCompactNumber(actual)} / ${formatCompactNumber(promised)} media items to ${name}${user.username ? ` (@${user.username})` : ''}`,
+          { ...mainAdminKeyboard() }
+        );
+      }
       return ctx.scene.leave();
     } catch (err) {
       console.error('[giftMedia]', err);
