@@ -45,6 +45,15 @@ function isBadFileIdentifierError(err) {
   );
 }
 
+function unwrapQueueResult(v) {
+  if (v instanceof Error) throw v;
+  if (Array.isArray(v)) {
+    const err = v.find((x) => x instanceof Error);
+    if (err) throw err;
+  }
+  return v;
+}
+
 async function deliverMedia(telegram, chatId, count, { excludeIds = [] } = {}) {
   const delivered = [];
   const usedIds = new Set(excludeIds.map((id) => id.toString()));
@@ -71,7 +80,7 @@ async function deliverMedia(telegram, chatId, count, { excludeIds = [] } = {}) {
       if (usedIds.has(itemId)) continue;
 
       try {
-        await enqueue(async () => {
+        unwrapQueueResult(await enqueue(async () => {
           await withRetry(async () => {
             if (item.fileType === 'photo') {
               await telegram.sendPhoto(chatId, item.fileId);
@@ -79,7 +88,7 @@ async function deliverMedia(telegram, chatId, count, { excludeIds = [] } = {}) {
               await telegram.sendVideo(chatId, item.fileId);
             }
           });
-        });
+        }));
 
         delivered.push(item);
         usedIds.add(itemId);
