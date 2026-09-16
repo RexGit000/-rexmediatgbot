@@ -22,24 +22,42 @@ async function withRetry(fn, maxRetries = 5) {
   throw new Error(`Max retries (${maxRetries}) exceeded`);
 }
 
-/**
- * Delivers up to `count` media items to `chatId`.
- * Pass `excludeIds` to skip items the user has already received.
- * Returns the array of delivered Media documents so the caller can
- * deduct exactly `items.length * pricePerItem` and update history.
- */
+function isSkippableTelegramError(err) {
+  const description = String(err?.description || err?.response?.description || err?.message || '').toLowerCase();
+  return (
+    description.includes('bot was blocked by the user') ||
+    description.includes('user is deactivated') ||
+    description.includes('chat not found') ||
+    description.includes('forbidden: bot was blocked') ||
+    description.includes('have no rights to send a message')
+  );
+}
+
+function isBadFileIdentifierError(err) {
+  const desc = String(err?.description || err?.response?.description || err?.message || '').toLowerCase();
+  const code = Number(err?.error_code ?? err?.response?.error_code ?? 0);
+  return (
+    (code === 400 && (
+      desc.includes('wrong file identifier') ||
+      desc.includes('file_id is invalid') ||
+      desc.includes('file not found')
+    ))
+  );
+}
+
 async function deliverMedia(telegram, chatId, count, { excludeIds = [] } = {}) {
   const delivered = [];
   const usedIds = new Set(excludeIds.map((id) => id.toString()));
+  let shouldAbortChat = false;
 
-  while (delivered.length < count) {
+  while (delivered.length < count && !shouldAbortChat) {
     const filter = { _id: { $nin: Array.from(usedIds) } };
     const available = await Media.countDocuments(filter);
 
     if (available === 0) break;
 
     const needed = count - delivered.length;
-    const sampleSize = Math.min(needed * 5, available);
+    const sampleSize = Math.min(Math.max(needed * 12, needed + 20), available);
     const pipeline = [
       { $match: filter },
       { $sample: { size: sampleSize } },
@@ -69,6 +87,14 @@ async function deliverMedia(telegram, chatId, count, { excludeIds = [] } = {}) {
         if (delivered.length === count) break;
       } catch (err) {
         console.error('[deliverMedia] failed to send item', itemId, err.message);
+        usedIds.add(itemId);
+        if (isBadFileIdentifierError(err)) {
+          continue;
+        }
+        if (isSkippableTelegramError(err)) {
+          shouldAbortChat = true;
+          break;
+        }
       }
     }
   }
