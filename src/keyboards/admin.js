@@ -8,6 +8,7 @@ function mainAdminKeyboard() {
     ['📢 Broadcast',        '📦 Package Settings'],
     ['📺 File Channel',     '📋 User List'],
     ['🎁 Gift Media',       toggleBtn],
+    ['🤖 Userbot Login'],
     ['👤 Switch to User View'],
   ]).resize();
 }

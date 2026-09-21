@@ -1,6 +1,6 @@
 const User    = require('../models/User');
 const Package = require('../models/Package');
-const adminCache = require('../cache');
+const { adminCache } = require('../cache');
 const { POINTS_PER_MEDIA } = require('../constants');
 const { checkAndAwardTiers, buildTiersList } = require('../utils/referral');
 const { mainUserKeyboard, startInlineKeyboard } = require('../keyboards/user');

@@ -5,7 +5,7 @@ const { mainAdminKeyboard, cancelKeyboard } = require('../keyboards/admin');
 const { formatCompactNumber, parseAdminInput } = require('../utils/helpers');
 const { deliverMedia } = require('../services/mediaService');
 const { deliverWithVerification } = require('../utils/mediaSendObserver');
-const adminCache = require('../cache');
+const { adminCache } = require('../cache');
 
 const giftMediaScene = new Scenes.BaseScene('GIFT_MEDIA');
 

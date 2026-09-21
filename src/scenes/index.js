@@ -4,6 +4,7 @@ const setChannelScene  = require('./setChannel');
 const broadcastScene   = require('./broadcast');
 const editPackageScene = require('./editPackage');
 const giftMediaScene   = require('./giftMedia');
+const userbotLoginScene = require('./userbotLogin');
 
 module.exports = [
   addAdminScene,
@@ -12,4 +13,5 @@ module.exports = [
   broadcastScene,
   editPackageScene,
   giftMediaScene,
+  userbotLoginScene,
 ];

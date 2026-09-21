@@ -1,7 +1,8 @@
 const Media    = require('../models/Media');
 const User     = require('../models/User');
 const Settings = require('../models/Settings');
-const adminCache = require('../cache');
+const { adminCache } = require('../cache');
+const { sleep } = require('../utils/helpers');
 
 async function checkChannelAccess(bot) {
   const channelId = await Settings.get('fileManagerChannel');
@@ -25,40 +26,17 @@ async function checkChannelAccess(bot) {
 async function syncMediaPool(bot) {
   await checkChannelAccess(bot);
 
-  const all = await Media.find({}, { _id: 1, fileId: 1 }).lean();
-  if (!all.length) {
+  const total = await Media.countDocuments();
+  if (!total) {
     console.log('[sync] Media pool is empty, nothing to check');
     return;
   }
 
-  console.log(`[sync] Checking ${all.length} media record(s)...`);
+  const BOT_KEY = String(process.env.CURRENT_BOT_KEY || (process.env.BOT_TOKEN || '').split(':')[0] || 'default').trim();
+  const seeded = await Media.countDocuments({ [`bot_file_ids.${BOT_KEY}`]: { $exists: true, $ne: null } });
+  const needCold = total - seeded;
 
-  const results = await Promise.allSettled(
-    all.map((m) => bot.telegram.getFile(m.fileId).then(() => null).catch(() => m._id))
-  );
-
-  const stale = results
-    .filter((r) => r.status === 'fulfilled' && r.value !== null)
-    .map((r) => r.value);
-
-  if (!stale.length) {
-    console.log('[sync] All media accessible — pool is clean');
-    return;
-  }
-
-  const failRate = stale.length / all.length;
-  if (failRate > 0.2) {
-    console.warn(`[sync] ${stale.length}/${all.length} files failed (${Math.round(failRate * 100)}%) — looks like a token or connectivity issue, skipping deletion to avoid data loss`);
-    return;
-  }
-
-  await Media.deleteMany({ _id: { $in: stale } });
-  await User.updateMany(
-    { receivedMedia: { $in: stale } },
-    { $pull: { receivedMedia: { $in: stale } } }
-  );
-
-  console.log(`[sync] Removed ${stale.length} inaccessible record(s) and cleared from user history`);
+  console.log(`[sync] ${total} media record(s); BOT_KEY=${BOT_KEY} — seeded=${seeded}, will-cold-reseed-on-first-redemption=${needCold}`);
 }
 
 module.exports = { syncMediaPool };
