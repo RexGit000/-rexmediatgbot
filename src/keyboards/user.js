@@ -1,5 +1,6 @@
 const { Markup } = require('telegraf');
 const { getNextTier } = require('../utils/referral');
+const { formatCompactNumber } = require('../utils/helpers');
 
 function mainUserKeyboard(isAdmin = false) {
   const rows = [
@@ -25,7 +26,7 @@ function startInlineKeyboard(user, packages, isAdmin, memberCount) {
   rows.push([{ text: `❤️ My Referral Progress (${inviteCount})`, callback_data: 'ref_progress',   style: 'danger'  }]);
 
   for (const pkg of packages) {
-    rows.push([{ text: `⭐ ${pkg.stars} Stars = ${pkg.mediaCount} Videos`, callback_data: `buy_pkg:${pkg._id}` }]);
+    rows.push([{ text: `⭐ ${formatCompactNumber(pkg.stars)} Stars = ${formatCompactNumber(pkg.mediaCount)} Videos`, callback_data: `buy_pkg:${pkg._id}` }]);
   }
 
   rows.push([{ text: '⭐ 📊 Referral Leaderboard',               callback_data: 'ref_leaderboard', style: 'primary' }]);
@@ -51,7 +52,7 @@ function statsInlineKeyboard(user, packages, isAdmin, memberCount) {
   ];
 
   for (const pkg of packages) {
-    rows.push([Markup.button.callback(`⭐ ${pkg.stars} Stars = ${pkg.mediaCount} Premium Videos`, `buy_pkg:${pkg._id}`)]);
+    rows.push([Markup.button.callback(`⭐ ${formatCompactNumber(pkg.stars)} Stars = ${formatCompactNumber(pkg.mediaCount)} Premium Videos`, `buy_pkg:${pkg._id}`)]);
   }
 
   rows.push([Markup.button.callback('📊 Referral Leaderboard', 'ref_leaderboard')]);
@@ -66,7 +67,7 @@ function statsInlineKeyboard(user, packages, isAdmin, memberCount) {
 function packagesKeyboard(packages) {
   const rows = packages.map((pkg) => [
     Markup.button.callback(
-      `⭐ ${pkg.stars} Stars → 🎬 ${pkg.mediaCount} Media`,
+      `⭐ ${formatCompactNumber(pkg.stars)} Stars → 🎬 ${formatCompactNumber(pkg.mediaCount)} Media`,
       `buy_pkg:${pkg._id}`
     ),
   ]);

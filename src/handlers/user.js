@@ -10,6 +10,7 @@ const { mainUserKeyboard, packagesKeyboard, statsInlineKeyboard } = require('../
 const { mainAdminKeyboard } = require('../keyboards/admin');
 const { buildAdminStats } = require('../utils/stats');
 const { deliverMedia } = require('../services/mediaService');
+const { formatCompactNumber } = require('../utils/helpers');
 
 async function unseenCount(user) {
   if (!user.receivedMedia?.length) return await Media.countDocuments();
@@ -341,9 +342,9 @@ module.exports = (bot) => {
       const paymentLink = `https://t.me/${nextPaymentBotUsername()}?start=${deepLinkPayload}`;
 
       const sent = await ctx.reply(
-        `📦 *${pkg.name}*\n\n` +
-        `💰 Price: *${pkg.stars} Stars* ⭐\n` +
-        `🎬 Includes: *${pkg.mediaCount} Media*\n\n` +
+        `📦 *${formatCompactNumber(pkg.mediaCount)} Media Pack*\n\n` +
+        `Get ${formatCompactNumber(pkg.mediaCount)} exclusive media items instantly!\n\n` +
+        `💰 Price: *${pkg.stars} Stars* ⭐\n\n` +
         `🔗 Click the button below to complete payment securely via our Payment Bot.`,
         {
           parse_mode: 'Markdown',

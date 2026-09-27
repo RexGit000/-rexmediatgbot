@@ -1,13 +1,13 @@
 require('dotenv').config({ override: true });
 const express  = require('express');
 const connectDB    = require('./db');
-require('./models/Media');
-require('./models/UserbotAccount');
 const Admin        = require('./models/Admin');
 const Settings     = require('./models/Settings');
 const User         = require('./models/User');
 const Order        = require('./models/Order');
-const { adminCache } = require('./cache');
+require('./models/Media');
+require('./models/UserbotAccount');
+const { adminCache }   = require('./cache');
 const botState     = require('./services/botState');
 const bot          = require('./bot');
 const { syncMediaPool } = require('./services/syncService');
@@ -17,7 +17,7 @@ const { deliverWithVerification } = require('./utils/mediaSendObserver');
 
 const SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
-const PORT = Number(process.env.port || process.env.PORT || 3003);
+const PORT = Number(process.env.port || process.env.PORT || 3004);
 
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err);
@@ -219,7 +219,7 @@ app.post('/api/payment-success', async (req, res) => {
             }
           },
           adminIdResolver: () => adminCache.getAllSuperAdminIds(),
-          botUsername: process.env.BOT_USERNAME || 'rexmediatgbot',
+          botUsername: process.env.BOT_USERNAME || 'starstomediabot',
         });
 
         if (result.rememberChanged && user) {
@@ -253,8 +253,6 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => console.log(`HTTP server listening on port ${PORT}`));
-
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function boot() {
@@ -277,6 +275,8 @@ async function boot() {
     }
     botState.set(true);
     console.log('Bot state: enabled');
+
+    app.listen(PORT, () => console.log(`HTTP server listening on port ${PORT}`));
 
     const me = await bot.telegram.getMe();
     console.log(`Bot connected: @${me.username} (ID: ${me.id})`);
