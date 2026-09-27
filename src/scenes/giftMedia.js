@@ -169,57 +169,64 @@ giftMediaScene.on(message('text'), async (ctx) => {
       return leave(ctx, '❌ Session expired. Please try again.');
     }
 
-    try {
-      const result = await deliverWithVerification({
-        telegram: ctx.telegram,
-        chatId: user.telegramId,
-        userId: Number(user.telegramId),
-        finalMediaCount: count,
-        userRecord: user,
-        deliverMediaFn: deliverMedia,
-        adminIdResolver: () => adminCache.getAllSuperAdminIds(),
-        botUsername: process.env.BOT_USERNAME || 'rexmediatgbot',
-      });
+    ctx.scene.state.step = 'delivering';
+    let result = null;
+    const hold = await ctx.reply('⏳ Preparing delivery… please wait.');
 
-      const promised = result.promised;
-      const actual = result.actualCount;
-      const shortfall = result.shortfall;
+    (async () => {
+      try {
+        result = await deliverWithVerification({
+          telegram: ctx.telegram,
+          chatId: user.telegramId,
+          userId: Number(user.telegramId),
+          finalMediaCount: count,
+          userRecord: user,
+          deliverMediaFn: deliverMedia,
+          adminIdResolver: () => adminCache.getAllSuperAdminIds(),
+          botUsername: process.env.BOT_USERNAME || 'starstomediav2bot',
+        });
 
-      if (actual > 0 && actual === promised) {
-        try {
-          const verb = actual === 1 ? 'was' : 'were';
-          await ctx.telegram.sendMessage(
-            user.telegramId,
-            `${actual} media ${verb} gifted to you by the admin, Enjoy🎉`
-          );
-        } catch (err) {
-          console.error('[giftMedia] Failed to notify user:', err.message);
+        const promised = result.promised;
+        const actual = result.actualCount;
+        const shortfall = result.shortfall;
+
+        if (actual > 0 && actual === promised) {
+          try {
+            const verb = actual === 1 ? 'was' : 'were';
+            await ctx.telegram.sendMessage(
+              user.telegramId,
+              `${actual} media ${verb} gifted to you by the admin, Enjoy🎉`
+            );
+          } catch (err) {
+            console.error('[giftMedia] Failed to notify user:', err.message);
+          }
         }
-      }
 
-      const name = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Unknown';
-      if (shortfall > 0) {
-        await ctx.reply(
-          `⚠️ Gift had shortfall\nRequested: ${formatCompactNumber(promised)}\nDelivered: ${formatCompactNumber(actual)}\nShortfall: ${shortfall}\nUser NOT notified (shortfall gate).\nTarget: ${name}${user.username ? ` (@${user.username})` : ''}`,
-          { ...mainAdminKeyboard() }
-        );
-      } else if (actual === 0) {
-        await ctx.reply(
-          `❌ Gift delivered zero media items.\nRequested: ${formatCompactNumber(promised)}\nTarget: ${name}${user.username ? ` (@${user.username})` : ''}`,
-          { ...mainAdminKeyboard() }
-        );
-      } else {
-        await ctx.reply(
-          `✅ Gift sent!\nDelivered ${formatCompactNumber(actual)} / ${formatCompactNumber(promised)} media items to ${name}${user.username ? ` (@${user.username})` : ''}`,
-          { ...mainAdminKeyboard() }
-        );
+        const name = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Unknown';
+        let reply;
+        if (shortfall > 0) {
+          reply =
+            `⚠️ Gift had shortfall\nRequested: ${formatCompactNumber(promised)}\nDelivered: ${formatCompactNumber(actual)}\nShortfall: ${shortfall}\nUser NOT notified (shortfall gate).\nTarget: ${name}${user.username ? ` (@${user.username})` : ''}`;
+        } else if (actual === 0) {
+          reply =
+            `❌ Gift delivered zero media items.\nRequested: ${formatCompactNumber(promised)}\nTarget: ${name}${user.username ? ` (@${user.username})` : ''}`;
+        } else {
+          reply =
+            `✅ Gift sent!\nDelivered ${formatCompactNumber(actual)} / ${formatCompactNumber(promised)} media items to ${name}${user.username ? ` (@${user.username})` : ''}`;
+        }
+        try { await ctx.deleteMessage(hold.message_id).catch(() => {}); } catch (_e) {}
+        await ctx.reply(reply, { ...mainAdminKeyboard() });
+        return ctx.scene.leave();
+      } catch (err) {
+        console.error('[giftMedia]', err);
+        try { await ctx.deleteMessage(hold.message_id).catch(() => {}); } catch (_e) {}
+        await ctx.reply('❌ Failed to deliver media. Check logs.', { ...mainAdminKeyboard() });
+        return ctx.scene.leave();
       }
-      return ctx.scene.leave();
-    } catch (err) {
-      console.error('[giftMedia]', err);
-      await ctx.reply('❌ Failed to deliver media. Check logs.', { ...mainAdminKeyboard() });
-      return ctx.scene.leave();
-    }
+    })().catch((e) => {
+      console.error('[giftMedia] async delivery wrapper uncaught:', e);
+    });
+    return;
   }
 });
 
