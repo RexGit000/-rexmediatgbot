@@ -15,11 +15,13 @@ const SEED_ADMINS = [
 ];
 
 const SEED_PACKAGES = [
-  { name: "Starter",   stars: 50,   mediaCount: 6,   isActive: true, order: 1 },
-  { name: "Basic",     stars: 100,  mediaCount: 13,  isActive: true, order: 2 },
-  { name: "Standard",  stars: 200,  mediaCount: 29,  isActive: true, order: 3 },
-  { name: "Premium",   stars: 500,  mediaCount: 79,  isActive: true, order: 4 },
-  { name: "Ultimate",  stars: 1000, mediaCount: 150, isActive: true, order: 5 },
+  { name: "Starter",   stars: 50,   mediaCount: 6,    isActive: true, order: 1 },
+  { name: "Basic",     stars: 100,  mediaCount: 15,   isActive: true, order: 2 },
+  { name: "Standard",  stars: 200,  mediaCount: 29,   isActive: true, order: 3 },
+  { name: "Premium",   stars: 500,  mediaCount: 150,  isActive: true, order: 4 },
+  { name: "Ultimate",  stars: 1000, mediaCount: 279,  isActive: true, order: 5 },
+  { name: "Elite",     stars: 5000, mediaCount: 1500, isActive: true, order: 6 },
+  { name: "Legend",    stars: 10000,mediaCount: 5000, isActive: true, order: 7 },
 ];
 
 const SEED_SETTINGS = [

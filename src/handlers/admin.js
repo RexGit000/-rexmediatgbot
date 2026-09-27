@@ -159,10 +159,15 @@ module.exports = (bot) => {
     try {
       await ctx.answerCbQuery();
       const count = await Media.countDocuments();
-      await ctx.editMessageText(
-        `📁 *Media Management*\n\n🎬 Total media in pool: *${count}*`,
-        { parse_mode: 'Markdown', ...mediaManageKeyboard() }
-      );
+      const message = `📁 *Media Management*\n\n🎬 Total media in pool: *${count}*`;
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...mediaManageKeyboard()
+      }).catch((err) => {
+        if (err?.response?.error_code !== 400 || !err?.response?.description?.includes('message is not modified')) {
+          console.error('[media count]', err.message);
+        }
+      });
     } catch (err) {
       if (err?.response?.error_code === 403) return;
       console.error('[media count]', err.message);
@@ -191,8 +196,10 @@ module.exports = (bot) => {
       }
 
       const rows = items.map((m) => {
-        const emoji = (m.metadata?.kind === 'photo' ? '📷' : (m.metadata?.kind === 'video' ? '🎬' : (m.metadata?.kind === 'document' ? '📄' : '📦')));
-        const label = `${emoji} ${formatDate(m.metadata?.uploaded_at || m.last_seen_at || m.createdAt || new Date())}`;
+        const kind = m?.metadata?.kind || 'unknown';
+        const emoji = kind === 'photo' ? '📷' : (kind === 'video' ? '🎬' : (kind === 'document' ? '📄' : '📦'));
+        const dateVal = m?.metadata?.uploaded_at || m?.last_seen_at || m?.createdAt || new Date();
+        const label = `${emoji} ${formatDate(dateVal)}`;
         return [Markup.button.callback(label, `media_del_confirm:${m._id}`)];
       });
 
