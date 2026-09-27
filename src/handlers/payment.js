@@ -2,6 +2,7 @@ const { message } = require('telegraf/filters');
 const Package = require('../models/Package');
 const User    = require('../models/User');
 const { deliverMedia } = require('../services/mediaService');
+const { formatCompactNumber } = require('../utils/helpers');
 
 /**
  * Telegram Stars (XTR) payment flow:
@@ -39,7 +40,7 @@ module.exports = (bot) => {
         if (pkg) mediaCount = pkg.mediaCount;
       }
 
-      await ctx.reply(`✅ Payment confirmed! Delivering your ${mediaCount} media item(s)...`);
+      await ctx.reply(`✅ Payment confirmed! Delivering your ${formatCompactNumber(mediaCount)} media item(s)...`);
 
       // Stars are already charged — deliver the full order (mix seen/unseen as needed)
       const user = await User.findOne({ telegramId: ctx.from.id });
@@ -56,7 +57,7 @@ module.exports = (bot) => {
         await user.save();
       }
 
-      await ctx.reply(`🎬 Enjoy your ${delivered} item(s)!`);
+      await ctx.reply(`🎬 Enjoy your ${formatCompactNumber(delivered)} item(s)!`);
     } catch (err) {
       if (err?.response?.error_code === 403) return;
       console.error('[successful_payment]', err.message);
